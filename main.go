@@ -14,12 +14,9 @@ import (
 )
 
 var (
-	mqttBroker = "tcp://cube.my.flat:1883"
-	clientID   = "go-home-automation"
-	baseTopic  = "zigbee2mqtt"
-
-	maxAttempts  = 10
-	stateTimeout = 5 * time.Second
+	mqttBroker  = "tcp://cube.my.flat:1883"
+	maxAttempts = 10
+	Timeout     = 5 * time.Second
 )
 
 // Device contains details about a discovered device.
@@ -30,60 +27,55 @@ type Device struct {
 }
 
 func main() {
-
-	// Define command-line flags
-	dump := flag.Bool("dump", false, "Dump all known devices")
-	debug := flag.Bool("debug", false, "Show all log ouptut")
-	flag.Parse()
-
-	// If -debug is in-play change the log-level
-	if *debug {
-		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			Level: slog.LevelInfo,
-		})))
-	} else {
-		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			Level: slog.LevelWarn,
-		})))
-	}
-
-	// Change the default MQTT host, if required.
-	if str := os.Getenv("MQ_HOST"); str != "" {
-		mqttBroker = fmt.Sprintf("tcp://%s:1883", str)
-	}
-
-	var err error
-
-	// Dumping devices?
-	if *dump {
-		err = dumpDevices()
-		if err != nil {
-			slog.Error("failed to dump devices", "error", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	// Otherwise just do the on/off thing.
-	if flag.NArg() != 2 {
-		fmt.Printf("Usage: %s [flags] NAME STATE\n", os.Args[0])
-		os.Exit(1)
-	}
-
-	err = run(flag.Arg(0), flag.Arg(1))
-
-	if err != nil {
+	if err := execute(); err != nil {
 		slog.Error("Program failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+func execute() error {
+	// Define command-line flags.
+	dump := flag.Bool("dump", false, "Dump all known devices")
+	debug := flag.Bool("debug", false, "Show all log output")
+	flag.Parse()
+
+	// Default debugging level, increased via "-debug"
+	level := slog.LevelWarn
+	if *debug {
+		level = slog.LevelInfo
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+
+	// Allow the MQTT host to be overridden through the environment.
+	if host := os.Getenv("MQ_HOST"); host != "" {
+		mqttBroker = fmt.Sprintf("tcp://%s:1883", host)
+	}
+
+	if !*dump && flag.NArg() != 2 {
+		fmt.Printf("usage: %s [flags] NAME STATE\n", os.Args[0])
+		return nil
+	}
+
+	// Establish one MQTT connection for the selected operation.
+	client, err := connect()
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(250)
+
+	if *dump {
+		return dumpDevices(client)
+	}
+
+	return run(client, flag.Arg(0), flag.Arg(1))
 }
 
 // connect returns a handle to the MQTT queue.
 func connect() (mqtt.Client, error) {
 	opts := mqtt.NewClientOptions().
 		AddBroker(mqttBroker).
-		SetClientID(fmt.Sprintf("%s-%d", clientID, os.Getpid())).
-		SetConnectTimeout(10 * time.Second).
+		SetClientID(fmt.Sprintf("go-home-automation-%d", os.Getpid())).
+		SetConnectTimeout(Timeout).
 		SetAutoReconnect(true).
 		SetOrderMatters(false)
 
@@ -92,7 +84,7 @@ func connect() (mqtt.Client, error) {
 	slog.Info("Connecting to MQTT broker", "broker", mqttBroker)
 
 	token := client.Connect()
-	if !token.WaitTimeout(10 * time.Second) {
+	if !token.WaitTimeout(Timeout) {
 		return nil, fmt.Errorf("MQTT connection timed out")
 	}
 	if err := token.Error(); err != nil {
@@ -106,7 +98,7 @@ func connect() (mqtt.Client, error) {
 
 // getDevices retrieves all known devices from Zigbee2MQTT.
 func getDevices(client mqtt.Client) ([]Device, error) {
-	devicesTopic := baseTopic + "/bridge/devices"
+	devicesTopic := "zigbee2mqtt/bridge/devices"
 	devicesChan := make(chan []Device, 1)
 
 	token := client.Subscribe(devicesTopic, 1, func(
@@ -126,7 +118,7 @@ func getDevices(client mqtt.Client) ([]Device, error) {
 		}
 	})
 
-	if !token.WaitTimeout(10 * time.Second) {
+	if !token.WaitTimeout(Timeout) {
 		return nil, fmt.Errorf("device list subscription timed out")
 	}
 	if err := token.Error(); err != nil {
@@ -140,7 +132,7 @@ func getDevices(client mqtt.Client) ([]Device, error) {
 		slog.Info("Received device list", "device_count", len(devices))
 		return devices, nil
 
-	case <-time.After(10 * time.Second):
+	case <-time.After(Timeout):
 		return nil, fmt.Errorf(
 			"timed out waiting for Zigbee2MQTT device list",
 		)
@@ -148,13 +140,7 @@ func getDevices(client mqtt.Client) ([]Device, error) {
 }
 
 // dumpDevices retrieves and displays all known devices.
-func dumpDevices() error {
-	client, err := connect()
-	if err != nil {
-		return err
-	}
-	defer client.Disconnect(250)
-
+func dumpDevices(client mqtt.Client) error {
 	devices, err := getDevices(client)
 	if err != nil {
 		return err
@@ -174,19 +160,13 @@ func dumpDevices() error {
 }
 
 // run finds all matching devices and sets their state.
-func run(friendlyName, desiredState string) error {
+func run(client mqtt.Client, friendlyName, desiredState string) error {
 	desiredState = strings.ToUpper(desiredState)
 
 	if desiredState != "ON" && desiredState != "OFF" {
 		fmt.Printf("Invalid desired state.\nState must be ON or OFF not %s\n", desiredState)
 		return nil
 	}
-
-	client, err := connect()
-	if err != nil {
-		return err
-	}
-	defer client.Disconnect(250)
 
 	// Look up all matching devices.
 	devices, err := getDevices(client)
@@ -276,7 +256,7 @@ func setDeviceState(
 		"ieee_address", device.IEEEAddress,
 	)
 
-	stateTopic := fmt.Sprintf("%s/%s", baseTopic, friendlyName)
+	stateTopic := fmt.Sprintf("zigbee2mqtt/%s", friendlyName)
 	commandTopic := stateTopic + "/set"
 	getTopic := stateTopic + "/get"
 
@@ -308,7 +288,7 @@ func setDeviceState(
 		}
 	})
 
-	if !token.WaitTimeout(10 * time.Second) {
+	if !token.WaitTimeout(Timeout) {
 		return fmt.Errorf("MQTT state subscription timed out")
 	}
 	if err := token.Error(); err != nil {
@@ -329,7 +309,7 @@ func setDeviceState(
 
 	token = client.Publish(getTopic, 1, false, getPayload)
 
-	if !token.WaitTimeout(10 * time.Second) {
+	if !token.WaitTimeout(Timeout) {
 		logger.Warn("State request timed out; continuing")
 	} else if err = token.Error(); err != nil {
 		logger.Error("State request failed", "error", err)
@@ -339,7 +319,7 @@ func setDeviceState(
 	currentState, received := waitForState(
 		stateChan,
 		desiredState,
-		stateTimeout,
+		Timeout,
 	)
 
 	if received {
@@ -377,7 +357,7 @@ func setDeviceState(
 
 		token = client.Publish(commandTopic, 1, false, payload)
 
-		if !token.WaitTimeout(10 * time.Second) {
+		if !token.WaitTimeout(Timeout) {
 			logger.Warn("Command publish timed out", "attempt", attempt)
 		} else if err := token.Error(); err != nil {
 			logger.Error(
@@ -393,7 +373,7 @@ func setDeviceState(
 		currentState, received = waitForState(
 			stateChan,
 			desiredState,
-			stateTimeout,
+			Timeout,
 		)
 
 		if received {
