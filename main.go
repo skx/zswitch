@@ -58,8 +58,7 @@ func main() {
 	if *dump {
 		err = dumpDevices()
 		if err != nil {
-			slog.Error("failed to dump devices",
-				"error", err)
+			slog.Error("failed to dump devices", "error", err)
 			os.Exit(1)
 		}
 		return
@@ -168,10 +167,7 @@ func dumpDevices() error {
 			continue
 		}
 		// show the details.
-		fmt.Printf("%s %s %s\n",
-			device.FriendlyName,
-			device.IEEEAddress,
-			device.Description)
+		fmt.Printf("%s %s %s\n", device.FriendlyName, device.IEEEAddress, device.Description)
 	}
 
 	return nil
