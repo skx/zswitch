@@ -81,7 +81,13 @@ func main() {
 	for _, dev := range devs {
 
 		// If the name is the name
+		// Or the name contains the name.
+		// Or the description contains the name.
 		if dev.FriendlyName == name || strings.Contains(dev.FriendlyName, name) || strings.Contains(dev.Description, name) {
+			slog.Info("changing state of devices",
+				"device", dev.FriendlyName,
+				"address", dev.IEEEAddress,
+				"state", state)
 			err := client.SetState(dev.FriendlyName, state)
 			if err != nil {
 				log.Fatalf("failed to change state", "device", name)
