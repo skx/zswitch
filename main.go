@@ -32,7 +32,7 @@ func main() {
 
 	client, err := ziglib.Connect(ziglib.Config{
 		Broker:   mqUri,
-		ClientID: "zigbee-webserver",
+		ClientID: "zigbee-switch",
 	})
 	if err != nil {
 		log.Fatalf("MQTT connection failed: %v", err)
