@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/skx/ziglib"
 )
@@ -80,7 +81,7 @@ func main() {
 	for _, dev := range devs {
 
 		// If the name is the name
-		if dev.FriendlyName == name {
+		if dev.FriendlyName == name || strings.Contains(dev.FriendlyName, name) || strings.Contains(dev.Description, name) {
 			err := client.SetState(dev.FriendlyName, state)
 			if err != nil {
 				log.Fatalf("failed to change state", "device", name)
