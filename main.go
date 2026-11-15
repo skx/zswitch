@@ -54,7 +54,7 @@ func main() {
 			if dev.FriendlyName == "Coordinator" {
 				continue
 			}
-			fmt.Printf("%s %s %s\n", dev.IEEEAddress, dev.FriendlyName, dev.Description)
+			fmt.Printf("%s %s %s %s\n", dev.IEEEAddress, dev.State, dev.FriendlyName, dev.Description)
 		}
 		return
 	}
