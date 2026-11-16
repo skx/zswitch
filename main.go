@@ -8,9 +8,33 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/skx/ziglib"
 )
+
+// Connect to MQTT, retrying a bunch of times if we see failure.
+func connectMQTT(config ziglib.Config) (*ziglib.Client, error) {
+	delay := 2 * time.Second
+	count := 1
+	max := 10
+	for count < max {
+		log.Printf("Connecting to MQTT broker attempt %d/%d...", count, max)
+
+		c, err := ziglib.Connect(config)
+		if err == nil {
+			return c, nil
+		}
+
+		log.Printf("MQTT connection failed: %v", err)
+		log.Printf("Retrying in %s...", delay)
+
+		time.Sleep(delay)
+
+		count++
+	}
+	return nil, fmt.Errorf("failed to connect to MQ after %d attempts", count)
+}
 
 func main() {
 	// MQ Host
@@ -42,7 +66,7 @@ func main() {
 	// Note: no ClientID is set, so the library generates a unique one.
 	// A fixed ID would cause concurrent invocations (e.g. from cron) to
 	// disconnect each other at the broker, losing state changes.
-	client, err := ziglib.Connect(ziglib.Config{
+	client, err := connectMQTT(ziglib.Config{
 		Broker:   mqUri,
 		Username: *mq_user,
 		Password: *mq_pass,
