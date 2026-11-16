@@ -30,9 +30,11 @@ func main() {
 	// Where we connect
 	mqUri := fmt.Sprintf("tcp://%s:%d/", *mq_host, *mq_port)
 
+	// Note: no ClientID is set, so the library generates a unique one.
+	// A fixed ID would cause concurrent invocations (e.g. from cron) to
+	// disconnect each other at the broker, losing state changes.
 	client, err := ziglib.Connect(ziglib.Config{
-		Broker:   mqUri,
-		ClientID: "zigbee-switch",
+		Broker: mqUri,
 	})
 	if err != nil {
 		log.Fatalf("MQTT connection failed: %v", err)
@@ -90,7 +92,7 @@ func main() {
 				"state", state)
 			err := client.SetState(dev.FriendlyName, state)
 			if err != nil {
-				log.Fatalf("failed to change state", "device", name)
+				log.Fatalf("failed to change state of %q: %v", dev.FriendlyName, err)
 			}
 		}
 	}
