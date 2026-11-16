@@ -40,7 +40,7 @@ Note that the name given, `socket-a` in this example, will be treated as a subst
 By default we connect to the MQ instance on `cube.my.flat` but command-line switches can configure the endpoint-details:
 
 | Flag       |                                    Purpose |
-+-------------+------------------------------------------------+
+| ---------- | ------------------------------------------ |
 | `-mq-host` | Specify the hostname or IP of the queue.   |
 | `-mq-user` | Specify the username to connect with.      |
 | `-mq-pass` | Specify the password to connect with.      |
