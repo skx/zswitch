@@ -31,7 +31,20 @@ Turning off a single switch:
 $ zswitch -debug socket-a off
 ```
 
-Add -mq-host/-mq-port to specify the address of the queue.
+Note that the name given, `socket-a` in this example, will be treated as a substring to match against the name/description of all switches.  So you can set all off via "switch-".
+
+
+
+## Configuration
+
+By default we connect to the MQ instance on `cube.my.flat` but command-line switches can configure the endpoint-details:
+
+| Flag       |                                    Purpose |
++-------------+------------------------------------------------+
+| `-mq-host` | Specify the hostname or IP of the queue.   |
+| `-mq-user` | Specify the username to connect with.      |
+| `-mq-pass` | Specify the password to connect with.      |
+| `-mq-port` | Specify the port-number to contact.        |
 
 
 

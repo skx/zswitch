@@ -13,11 +13,20 @@ import (
 )
 
 func main() {
+	// MQ Host
+	host := "cube.my.flat"
+	if os.Getenv("MQ_HOST") != "" {
+		host = os.Getenv("MQ_HOST")
+	}
+
 	// Define command-line flags.
 	dump := flag.Bool("dump", false, "Dump all known devices")
 	debug := flag.Bool("debug", false, "Show all log output")
-	mq_host := flag.String("mq-host", "cube.my.flat", "The MQ host address")
+	mq_host := flag.String("mq-host", host, "The MQ host address")
 	mq_port := flag.Int("mq-port", 1883, "The MQ host port.")
+	mq_user := flag.String("mq-user", "", "The username to authenticate to the queue with")
+	mq_pass := flag.String("mq-pass", "", "The password to authenticate to the queue with")
+
 	flag.Parse()
 
 	// Default debugging level, increased via "-debug"
@@ -34,7 +43,9 @@ func main() {
 	// A fixed ID would cause concurrent invocations (e.g. from cron) to
 	// disconnect each other at the broker, losing state changes.
 	client, err := ziglib.Connect(ziglib.Config{
-		Broker: mqUri,
+		Broker:   mqUri,
+		Username: *mq_user,
+		Password: *mq_pass,
 	})
 	if err != nil {
 		log.Fatalf("MQTT connection failed: %v", err)
