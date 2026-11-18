@@ -81,6 +81,7 @@ socket-D 0xa4c1381e8a63ffff Bedroom double lamps on shelf
 ## Links
 
 * Applications
+  * [zalert](https://github.com/skx/zalert) - Signal an alert by flashing bulbs which are turned on.
   * [zswitch](https://github.com/skx/zswitch) - Simple CLI to change state of zigbee switches.
   * [zweb](https://github.com/skx/zweb) - Simple WebUI for switch-devices.
 * Library
